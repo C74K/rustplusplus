@@ -33,5 +33,8 @@ module.exports = {
     },
     battlemetrics: {
         token: process.env.RPP_BATTLEMETRICS_TOKEN || '',
+        get enabled() {
+            return typeof this.token === 'string' && this.token.trim().length > 0;
+        },
     }
 };

@@ -21,6 +21,7 @@
 const Discord = require('discord.js');
 
 const Battlemetrics = require('../structures/Battlemetrics');
+const Config = require('../../config');
 const Constants = require('../util/constants.js');
 const DiscordEmbeds = require('../discordTools/discordEmbeds.js');
 const DiscordMessages = require('../discordTools/discordMessages.js');
@@ -88,6 +89,9 @@ module.exports = async (client, interaction) => {
         if (battlemetricsId !== server.battlemetricsId) {
             if (battlemetricsId === '') {
                 server.battlemetricsId = null;
+            }
+            else if (!Config.battlemetrics.enabled) {
+                /* Keep the existing Battlemetrics ID while the integration is disabled. */
             }
             else if (client.battlemetricsInstances.hasOwnProperty(battlemetricsId)) {
                 const bmInstance = client.battlemetricsInstances[battlemetricsId];
@@ -292,7 +296,7 @@ module.exports = async (client, interaction) => {
             client.battlemetricsIntervalCounter = 0;
         }
 
-        if (trackerBattlemetricsId !== tracker.battlemetricsId) {
+        if (Config.battlemetrics.enabled && trackerBattlemetricsId !== tracker.battlemetricsId) {
             if (client.battlemetricsInstances.hasOwnProperty(trackerBattlemetricsId)) {
                 const bmInstance = client.battlemetricsInstances[trackerBattlemetricsId];
                 tracker.battlemetricsId = trackerBattlemetricsId;

@@ -221,10 +221,12 @@ class Battlemetrics {
      *  @return {object} The response from Axios library.
      */
     async #request(api_call) {
+        if (!Config.battlemetrics.enabled) return null;
+
         try {
             return await Axios.get(api_call, {
                 headers: {
-                    Authorization: `Bearer ${Config.battlemetrics.token}`,
+                    Authorization: `Bearer ${Config.battlemetrics.token.trim()}`,
                 },
             });
         }
@@ -387,9 +389,10 @@ class Battlemetrics {
      *  @return {(object|null)} The response data.
      */
     async request(api_call) {
-        if (this.id === null) return null;
+        if (!Config.battlemetrics.enabled || this.id === null) return null;
 
         const response = await this.#request(api_call);
+        if (response === null) return null;
 
         if (response.status !== 200) {
             Client.client.log(Client.client.intlGet(null, 'errorCap'),
@@ -406,6 +409,8 @@ class Battlemetrics {
      *  decide if the server is streamer mode or not.
      */
     async setup() {
+        if (!Config.battlemetrics.enabled) return;
+
         if (this.id === null && this.name === null) {
             Client.client.log(Client.client.intlGet(null, 'errorCap'),
                 Client.client.intlGet(null, 'battlemetricsIdAndNameMissing'), 'error');
@@ -445,10 +450,13 @@ class Battlemetrics {
      *  @return {number|null} The id of the server.
      */
     async getServerIdFromName(name) {
+        if (!Config.battlemetrics.enabled) return null;
+
         const originalName = name;
         name = encodeURI(name).replace('\#', '\*');
         const search = this.SEARCH_SERVER_NAME_API_CALL(name);
         const response = await this.#request(search);
+        if (response === null) return null;
 
         if (response.status !== 200) {
             Client.client.log(Client.client.intlGet(null, 'errorCap'),
@@ -484,7 +492,7 @@ class Battlemetrics {
      *  @return {bool|null} null if id is not set, false if something went wrong, true if successful.
      */
     async evaluation(data = null, firstTime = false) {
-        if (this.id === null) return null;
+        if (!Config.battlemetrics.enabled || this.id === null) return null;
 
         if (data === null) {
             data = await this.request(this.GET_SERVER_DATA_API_CALL(this.id));

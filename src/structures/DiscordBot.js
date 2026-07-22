@@ -378,6 +378,11 @@ class DiscordBot extends Discord.Client {
      *  Check if Battlemetrics instances are missing/not required/need update.
      */
     async updateBattlemetricsInstances() {
+        if (!Config.battlemetrics.enabled) {
+            this.battlemetricsInstances = new Object();
+            return;
+        }
+
         const activeInstances = [];
 
         /* Check for instances that are missing or need update. */

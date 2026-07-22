@@ -19,12 +19,15 @@
 */
 
 const Constants = require('../util/constants.js');
+const Config = require('../../config');
 const DiscordMessages = require('../discordTools/discordMessages.js');
 const DiscordTools = require('../discordTools/discordTools.js');
 const Scrape = require('../util/scrape.js');
 
 module.exports = {
     handler: async function (client, firstTime = false) {
+        if (!Config.battlemetrics.enabled) return;
+
         const searchSteamProfiles = (client.battlemetricsIntervalCounter === 0) ? true : false;
         const calledSteamProfiles = new Object();
 
