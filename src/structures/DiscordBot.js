@@ -170,19 +170,20 @@ class DiscordBot extends Discord.Client {
 
     build() {
         this.login(Config.discord.token).catch(error => {
+            const formattedError = this.logger.formatError(error);
             switch (error.code) {
                 case 502: {
                     this.log(this.intlGet(null, 'errorCap'),
-                        this.intlGet(null, 'badGateway', { error: JSON.stringify(error) }), 'error')
+                        this.intlGet(null, 'badGateway', { error: formattedError }), 'error')
                 } break;
 
                 case 503: {
                     this.log(this.intlGet(null, 'errorCap'),
-                        this.intlGet(null, 'serviceUnavailable', { error: JSON.stringify(error) }), 'error')
+                        this.intlGet(null, 'serviceUnavailable', { error: formattedError }), 'error')
                 } break;
 
                 default: {
-                    this.log(this.intlGet(null, 'errorCap'), `${JSON.stringify(error)}`, 'error');
+                    this.log(this.intlGet(null, 'errorCap'), error, 'error');
                 } break;
             }
         });

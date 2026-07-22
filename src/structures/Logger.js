@@ -22,6 +22,7 @@ const Colors = require("colors");
 const Winston = require("winston");
 
 const Config = require('../../config');
+const formatLogValue = require('../util/formatLogValue');
 
 class Logger {
     constructor(logFilePath, type) {
@@ -56,57 +57,47 @@ class Logger {
         return `${year}-${month}-${date} ${hours}:${minutes}:${seconds}`;
     }
 
+    formatError(error, includeStack = Config.general.showCallStackError) {
+        return formatLogValue(error, {
+            includeStack: Boolean(includeStack),
+            secrets: [Config.discord.token, Config.battlemetrics?.token],
+        });
+    }
+
     log(title, text, level) {
         let time = this.getTime();
+        const lines = this.formatError(text, level === 'error' && Config.general.showCallStackError)
+            .split(/\r?\n/);
+        lines[0] = `${title}: ${lines[0]}`;
 
         switch (this.type) {
             case 'default': {
-                text = `${title}: ${text}`;
-                this.logger.log({
-                    level: level,
-                    message: `${time} | ${text}`
-                });
+                for (const line of lines) {
+                    this.logger.log({
+                        level: level,
+                        message: `${time} | ${line}`
+                    });
 
-                console.log(
-                    Colors.green(`${time} `) +
-                    ((level === 'error') ? Colors.red(text) : Colors.yellow(text))
-                );
-
-                if (level === 'error' && Config.general.showCallStackError) {
-                    for (let line of (new Error().stack.split(/\r?\n/))) {
-                        this.logger.log({ level: level, message: `${time} | ${line}` });
-                        console.log(Colors.green(`${time} `) + Colors.red(line));
-                    }
+                    console.log(
+                        Colors.green(`${time} `) +
+                        ((level === 'error') ? Colors.red(line) : Colors.yellow(line))
+                    );
                 }
             } break;
 
             case 'guild': {
-                text = `${title}: ${text}`;
+                for (const line of lines) {
+                    this.logger.log({
+                        level: level,
+                        message: `${time} | ${this.guildId} | ${this.serverName} | ${line}`
+                    });
 
-                this.logger.log({
-                    level: level,
-                    message: `${time} | ${this.guildId} | ${this.serverName} | ${text}`
-                });
-
-                console.log(
-                    Colors.green(`${time} `) +
-                    Colors.cyan(`${this.guildId} `) +
-                    Colors.white(`${this.serverName} `) +
-                    ((level === 'error') ? Colors.red(text) : Colors.yellow(text))
-                );
-
-                if (level === 'error' && Config.general.showCallStackError) {
-                    for (let line of (new Error().stack.split(/\r?\n/))) {
-                        this.logger.log({
-                            level: level,
-                            message: `${time} | ${this.guildId} | ${this.serverName} | ${line}`
-                        });
-                        console.log(
-                            Colors.green(`${time} `) +
-                            Colors.cyan(`${this.guildId} `) +
-                            Colors.white(`${this.serverName} `) +
-                            Colors.red(line));
-                    }
+                    console.log(
+                        Colors.green(`${time} `) +
+                        Colors.cyan(`${this.guildId} `) +
+                        Colors.white(`${this.serverName} `) +
+                        ((level === 'error') ? Colors.red(line) : Colors.yellow(line))
+                    );
                 }
             } break;
 
