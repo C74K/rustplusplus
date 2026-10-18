@@ -31,6 +31,19 @@ function isValidUrl(url) {
     return false;
 }
 
+/* Rust+ only gives the server IP and the app (Rust+) port, never the game port. On a default Rust server the game port
+   is the app port minus 67 (28015 vs 28082), so that is used as an estimate when Battlemetrics did not provide the
+   address. Change the offset if your hoster uses a different scheme. */
+const APP_PORT_TO_GAME_PORT_OFFSET = 67;
+
+function getConnectString(server) {
+    if (server.connect !== null && server.connect !== undefined) return server.connect;
+
+    const appPort = parseInt(server.appPort);
+    if (!server.serverIp || !Number.isInteger(appPort) || appPort <= APP_PORT_TO_GAME_PORT_OFFSET) return null;
+    return `connect ${server.serverIp}:${appPort - APP_PORT_TO_GAME_PORT_OFFSET}`;
+}
+
 module.exports = {
     getEmbed: function (options = {}) {
         const embed = new Discord.EmbedBuilder();
@@ -101,8 +114,8 @@ module.exports = {
             thumbnail: `${server.img}`,
             fields: [{
                 name: Client.client.intlGet(guildId, 'connect'),
-                value: `\`${server.connect === null ?
-                    Client.client.intlGet(guildId, 'unavailable') : server.connect}\``,
+                value: `\`${getConnectString(server) ??
+                    Client.client.intlGet(guildId, 'unavailable')}\``,
                 inline: true
             },
             {
@@ -744,10 +757,11 @@ module.exports = {
             { name: mapSaltFieldName, value: `\`${rustplus.info.salt}\``, inline: true },
             { name: mapFieldName, value: `\`${rustplus.info.map}\``, inline: true });
 
-        if (instance.serverList[rustplus.serverId].connect !== null) {
+        const connectString = getConnectString(instance.serverList[rustplus.serverId]);
+        if (connectString !== null) {
             embed.addFields({
                 name: Client.client.intlGet(guildId, 'connect'),
-                value: `\`${instance.serverList[rustplus.serverId].connect}\``,
+                value: `\`${connectString}\``,
                 inline: false
             });
         }

@@ -40,6 +40,71 @@ const RustPlusLite = require('../structures/RustPlusLite');
 const TeamHandler = require('../handlers/teamHandler.js');
 const Timer = require('../util/timer.js');
 
+/* Translation: Google (default engine of the 'translate' package) is tried first. If it fails (for example because
+   Google blocks the server IP and returns an HTML page instead of JSON), a fallback engine is used:
+   DeepL if the DEEPL_KEY environment variable is set, otherwise MyMemory (free, no key, daily character limit). */
+const decodeHtmlEntities = (str) => str
+    .replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+
+Translate.engines.mymemory = {
+    needkey: false,
+    fetch: ({ from, to, text }) => [
+        `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${from}|${to}`
+    ],
+    parse: async res => {
+        if (!res.ok) throw new Error(`MyMemory error ${res.status}`);
+        const body = await res.json();
+        if (Number(body.responseStatus) !== 200 || !body.responseData || !body.responseData.translatedText) {
+            throw new Error(`MyMemory: ${body.responseDetails || 'no translation'}`);
+        }
+        return decodeHtmlEntities(body.responseData.translatedText);
+    }
+};
+
+Translate.engines.deeplHeader = {
+    needkey: true,
+    fetch: ({ key, from, to, text }) => {
+        const host = key.endsWith(':fx') ? 'api-free.deepl.com' : 'api.deepl.com';
+        return [`https://${host}/v2/translate`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `DeepL-Auth-Key ${key}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                text: [text],
+                source_lang: from.toUpperCase(),
+                target_lang: to.toUpperCase()
+            })
+        }];
+    },
+    parse: async res => {
+        if (!res.ok) throw new Error(`DeepL error ${res.status}`);
+        const body = await res.json();
+        return body.translations[0].text;
+    }
+};
+
+async function translateText(text, opts) {
+    /* The 'translate' package modifies the options object it receives, so every call gets a fresh copy. */
+    const makeOpts = () => (typeof opts === 'string') ? { to: opts } : { ...opts };
+
+    try {
+        return await Translate(text, makeOpts());
+    }
+    catch (e) {
+        /* A wrong language code will fail on any engine, so there is no point in trying the fallback. */
+        if (/The language "/.test(e.message)) throw e;
+
+        console.error('[translate] primary engine failed, trying fallback:', e.message);
+        const fallback = process.env.DEEPL_KEY ? 'deeplHeader' : 'mymemory';
+        const fallbackOpts = makeOpts();
+        fallbackOpts.engine = fallback;
+        if (fallback === 'deeplHeader') fallbackOpts.key = process.env.DEEPL_KEY;
+        return await Translate(text, fallbackOpts);
+    }
+}
+
 const TOKENS_LIMIT = 24;        /* Per player */
 const TOKENS_REPLENISH = 3;     /* Per second */
 
@@ -3032,12 +3097,16 @@ class RustPlus extends RustPlusLib {
         }
 
         try {
-            return await Translate(text, language);
+            return await translateText(text, language);
         }
         catch (e) {
-            return Client.client.intlGet(this.guildId, 'languageLangNotSupported', {
-                language: language
-            });
+            console.error('[translate] failed:', e);
+            if (/The language "/.test(e.message)) {
+                return Client.client.intlGet(this.guildId, 'languageLangNotSupported', {
+                    language: language
+                });
+            }
+            return Client.client.intlGet(this.guildId, 'languageNotSupported');
         }
     }
 
@@ -3063,18 +3132,16 @@ class RustPlus extends RustPlusLib {
         }
 
         try {
-            return await Translate(text, { from: languageFrom, to: languageTo });
+            return await translateText(text, { from: languageFrom, to: languageTo });
         }
         catch (e) {
-            const regex = new RegExp('The language "(.*?)"');
-            const invalidLanguage = regex.exec(e.message);
-
-            if (invalidLanguage.length === 2) {
+            console.error('[translate] failed:', e);
+            const invalidLanguage = /The language "(.*?)"/.exec(e.message);
+            if (invalidLanguage) {
                 return Client.client.intlGet(this.guildId, 'languageLangNotSupported', {
                     language: invalidLanguage[1]
                 });
             }
-
             return Client.client.intlGet(this.guildId, 'languageNotSupported');
         }
     }
